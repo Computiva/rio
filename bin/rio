@@ -30,15 +30,20 @@ def getoption(arg):
 def ifoption(arg, value, default=""):
     return arg in args.args and value or default
 
+def read():
+    return stdin
+
 parser = argparse.ArgumentParser(description="Run commands in a flow")
 parser.add_argument("file", type=argparse.FileType("r"), help="file to run")
 parser.add_argument("-m", "--one-mouth", action="store_true", help="all the data flows to the standard output")
 parser.add_argument("args", nargs=argparse.REMAINDER)
 args = parser.parse_args()
-internal_commands = [getoption, ifoption]
+internal_commands = [getoption, ifoption, read]
 if args.one_mouth:
     processes = list()
     lines = args.file.readlines()
+    if filter(lambda line: re.match(r"^ *read *$", line), lines):
+        stdin = sys.stdin.read()
     for line_number, line in enumerate(lines):
         indent = re.search(r"^ *", line).group()
         parent_process = get_parent_process(indent, processes)
