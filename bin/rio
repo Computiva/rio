@@ -24,14 +24,18 @@ def has_children(line_number, lines):
     next_indent = re.search("^ *", next_line).group()
     return len(indent) < len(next_indent)
 
-def getoption(arg, args):
-    return args[args.index(arg) + 1]
+def getoption(arg):
+    return args.args[args.args.index(arg) + 1]
+
+def ifoption(arg, value, default=""):
+    return arg in args.args and value or default
 
 parser = argparse.ArgumentParser(description="Run commands in a flow")
 parser.add_argument("file", type=argparse.FileType("r"), help="file to run")
 parser.add_argument("-m", "--one-mouth", action="store_true", help="all the data flows to the standard output")
 parser.add_argument("args", nargs=argparse.REMAINDER)
 args = parser.parse_args()
+internal_commands = [getoption, ifoption]
 if args.one_mouth:
     processes = list()
     lines = args.file.readlines()
@@ -42,8 +46,9 @@ if args.one_mouth:
             last_process = get_last_process(indent, processes)
             if last_process:
                 last_process.communicate()
-            if re.match(r"^ *getoption", line):
-                parent_process.stdin.write(str(getoption(line.split()[1], args.args)))
+            command = filter(lambda command: re.search(r"^ *([^ \n]+)", line).groups()[0] == command.func_name, internal_commands)
+            if command:
+                parent_process.stdin.write(str(command[0](*line.split()[1:])))
                 process = None
             else:
                 if has_children(line_number, lines):
@@ -54,8 +59,9 @@ if args.one_mouth:
             last_process = get_last_process(indent, processes)
             if last_process:
                 last_process.communicate()
-            if re.match(r"^ *getoption", line):
-                sys.stdout.write(str(getoption(line.split()[1], args.args)))
+            command = filter(lambda command: re.search(r"^ *([^ \n]+)", line).groups()[0] == command.func_name, internal_commands)
+            if command:
+                sys.stdout.write(str(command[0](*line.split()[1:])))
                 sys.stdout.flush()
                 process = None
             else:
