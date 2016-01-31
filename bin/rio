@@ -24,29 +24,45 @@ def has_children(line_number, lines):
     next_indent = re.search("^ *", next_line).group()
     return len(indent) < len(next_indent)
 
+def getoption(arg, args):
+    return args[args.index(arg) + 1]
+
 parser = argparse.ArgumentParser(description="Run commands in a flow")
 parser.add_argument("file", type=argparse.FileType("r"), help="file to run")
 parser.add_argument("-m", "--one-mouth", action="store_true", help="all the data flows to the standard output")
+parser.add_argument("args", nargs=argparse.REMAINDER)
 args = parser.parse_args()
 if args.one_mouth:
     processes = list()
     lines = args.file.readlines()
     for line_number, line in enumerate(lines):
-        indent = re.search("^ *", line).group()
+        indent = re.search(r"^ *", line).group()
         parent_process = get_parent_process(indent, processes)
         if parent_process:
             last_process = get_last_process(indent, processes)
             if last_process:
                 last_process.communicate()
-            if has_children(line_number, lines):
-                process = subprocess.Popen(line, shell=True, stdin=subprocess.PIPE, stdout=parent_process.stdin)
+            if re.match(r"^ *getoption", line):
+                parent_process.stdin.write(str(getoption(line.split()[1], args.args)))
+                process = None
             else:
-                process = subprocess.Popen(line, shell=True, stdout=parent_process.stdin)
+                if has_children(line_number, lines):
+                    process = subprocess.Popen(line, shell=True, stdin=subprocess.PIPE, stdout=parent_process.stdin)
+                else:
+                    process = subprocess.Popen(line, shell=True, stdout=parent_process.stdin)
         else:
-            if has_children(line_number, lines):
-                process = subprocess.Popen(line, shell=True, stdin=subprocess.PIPE, stdout=sys.stdout)
+            last_process = get_last_process(indent, processes)
+            if last_process:
+                last_process.communicate()
+            if re.match(r"^ *getoption", line):
+                sys.stdout.write(str(getoption(line.split()[1], args.args)))
+                sys.stdout.flush()
+                process = None
             else:
-                process = subprocess.Popen(line, shell=True, stdout=sys.stdout)
+                if has_children(line_number, lines):
+                    process = subprocess.Popen(line, shell=True, stdin=subprocess.PIPE, stdout=sys.stdout)
+                else:
+                    process = subprocess.Popen(line, shell=True, stdout=sys.stdout)
         processes.append([indent, process])
     sys.exit(0)
 process = subprocess.Popen(args.file.readline(), shell=True, stdin=sys.stdin, stdout=subprocess.PIPE)

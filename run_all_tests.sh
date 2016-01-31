@@ -1,6 +1,6 @@
 #! /bin/bash
 
-export PATH+=":`readlink -f ./bin`"
+export PATH="`readlink -f ./bin`:$PATH"
 for filename in tests/*
 do
 	complete_filename=`readlink -f $filename`
